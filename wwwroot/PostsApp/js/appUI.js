@@ -12,6 +12,9 @@ function Init_UI() {
         saveContentScrollPosition();
         renderCreatePostForm();
     });
+    $('#savePost').on("click", async function () {
+        renderPosts();
+    });
     $('#abort').on("click", async function () {
         renderPosts();
     });
@@ -42,50 +45,41 @@ function renderAbout() {
     $("#dropdownMenu").hide();
     $("#abort").show();
     $("#actionTitle").text("À propos...");
-    $("#content").append(
-        $(` 
-            <div class="aboutContainer">
-                <h2>Gestionnaire de posts</h2>
-                <hr>
-                <p>
-                    Petite application de gestion de posts à titre de démonstration
-                    d'interface utilisateur monopage réactive.
-                </p>
-                <p>
-                    Auteur: Nicolas Chourot
-                </p>
-                <p>
-                    Collège Lionel-Groulx, automne 2025
-                </p>
-            </div>
-        `)
-    );
+    $("#content").append(`
+        <div class="aboutContainer">
+            <h2>Gestionnaire de posts</h2>
+            <hr>
+            <p>Application de gestion de posts démontrant une interface monopage réactive.</p>
+            <p>Auteur: Nicolas Chourot</p>
+            <p>Collège Lionel-Groulx, Automne 2025</p>
+        </div>
+    `);
 }
 
 function updateDropDownMenu(categories) {
     let DDMenu = $("#DDMenu");
     let selectClass = selectedCategory === "" ? "fa-check" : "fa-fw";
     DDMenu.empty();
-    DDMenu.append($(`
+    DDMenu.append(`
         <div class="dropdown-item menuItemLayout" id="allCatCmd">
             <i class="menuIcon fa ${selectClass} mx-2"></i> Toutes les catégories
         </div>
-    `));
-    DDMenu.append($(`<div class="dropdown-divider"></div>`));
+    `);
+    DDMenu.append(`<div class="dropdown-divider"></div>`);
     categories.forEach(category => {
         selectClass = selectedCategory === category ? "fa-check" : "fa-fw";
-        DDMenu.append($(`
-            <div class="dropdown-item menuItemLayout category" id="allCatCmd">
+        DDMenu.append(`
+            <div class="dropdown-item menuItemLayout category">
                 <i class="menuIcon fa ${selectClass} mx-2"></i> ${category}
             </div>
-        `));
+        `);
     });
-    DDMenu.append($(`<div class="dropdown-divider"></div>`));
-    DDMenu.append($(`
+    DDMenu.append(`<div class="dropdown-divider"></div>`);
+    DDMenu.append(`
         <div class="dropdown-item menuItemLayout" id="aboutCmd">
             <i class="menuIcon fa fa-info-circle mx-2"></i> À propos...
         </div>
-    `));
+    `);
     $('#aboutCmd').on("click", function () {
         renderAbout();
     });
@@ -116,6 +110,7 @@ async function renderPosts() {
     $("#actionTitle").text("Liste des posts");
     $("#createPost").show();
     $("#dropdownMenu").show();
+    $("#savePost").hide();
     $("#abort").hide();
     let posts = await Posts_API.Get();
     currentETag = Posts_API.Etag;
@@ -144,7 +139,7 @@ async function renderPosts() {
 
 function showWaitingGif() {
     $("#content").empty();
-    $("#content").append($("<div class='waitingGifcontainer'><img class='waitingGif' src='Loading_icon.gif' /></div>'"));
+    $("#content").append(`<div class='waitingGifcontainer'><img class='waitingGif' src='Loading_icon.gif' /></div>`);
 }
 
 function eraseContent() {
@@ -162,9 +157,7 @@ function restoreContentScrollPosition() {
 function renderError(message = "") {
     message = (message == "" ? Posts_API.currentHttpError : message);
     eraseContent();
-    $("#content").append(
-        $(`<div class="errorContainer">${message}</div>`)
-    );
+    $("#content").append(`<div class="errorContainer">${message}</div>`);
 }
 
 function renderCreatePostForm() {
@@ -184,6 +177,7 @@ async function renderDeletePostForm(id) {
     showWaitingGif();
     $("#createPost").hide();
     $("#dropdownMenu").hide();
+    $("#savePost").show();
     $("#abort").show();
     $("#actionTitle").text("Retrait");
     let post = await Posts_API.Get(id);
@@ -195,6 +189,7 @@ async function renderDeletePostForm(id) {
             <div class="postRow" post_id="${post.Id}">
                 <div class="postContainer noselect">
                     <div class="postLayout">
+                    <img src="${post.Image}" class="postImage" alt="${post.Title}" />
                         <div class="post">
                             <span class="postTitle">${post.Title}</span>
                         </div>
@@ -202,12 +197,10 @@ async function renderDeletePostForm(id) {
                     </div>
                 </div>
             </div>
-            <br>
-            <input type="button" value="Effacer" id="deletePost" class="btn btn-primary">
-            <input type="button" value="Annuler" id="cancel" class="btn btn-secondary">
         </div>
         `);
-        $('#deletePost').on("click", async function () {
+        // bouton global = confirmation suppression
+        $('#savePost').off("click").on("click", async function () {
             showWaitingGif();
             let result = await Posts_API.Delete(post.Id);
             if (result)
@@ -215,9 +208,11 @@ async function renderDeletePostForm(id) {
             else
                 renderError();
         });
-        $('#cancel').on("click", function () {
+
+        $('#abort').off("click").on("click", function () {
             renderPosts();
         });
+
     } else {
         renderError("Post introuvable!");
     }
@@ -233,20 +228,28 @@ function getFormData($form) {
 }
 
 function newPost() {
-    return { Id: 0, Title: "", Text: "", Category: "" };
+    return { Id: 0, Title: "", Text: "", Category: "", Image: "", Creation: Date.now() };
 }
 
 function renderPostForm(post = null) {
     hold_Periodic_Refresh = true;
     $("#createPost").hide();
     $("#dropdownMenu").hide();
+    $("#savePost").show();
+    $("#savePost").show();
     $("#abort").show();
     eraseContent();
+
     let create = post == null;
-    if (create) post = newPost();
+    if (create) {
+        post = newPost();
+        post.Image = "images/no-image.png"; // image par défaut
+    }
+
     $("#actionTitle").text(create ? "Création" : "Modification");
+
     $("#content").append(`
-        <form class="form" id="PostForm">
+        <form class="form" id="postForm">
             <input type="hidden" name="Id" value="${post.Id}"/>
 
             <label for="Title" class="form-label">Titre </label>
@@ -256,8 +259,11 @@ function renderPostForm(post = null) {
                 id="Title" 
                 placeholder="Titre"
                 required
+                RequireMessage="Veuillez entrer un titre"
+                InvalidMessage="Le titre comporte un caractère illégal"
                 value="${post.Title}"
             />
+
             <label for="Text" class="form-label">Texte </label>
             <textarea
                 class="form-control"
@@ -265,7 +271,9 @@ function renderPostForm(post = null) {
                 id="Text"
                 placeholder="Contenu du post"
                 required
+                RequireMessage="Veuillez entrer le texte du post"
             >${post.Text}</textarea>
+
             <label for="Category" class="form-label">Catégorie </label>
             <input 
                 class="form-control"
@@ -273,34 +281,54 @@ function renderPostForm(post = null) {
                 id="Category"
                 placeholder="Catégorie"
                 required
+                RequireMessage="Veuillez entrer une catégorie"
                 value="${post.Category}"
             />
-            <br>
-            <input type="submit" value="Enregistrer" id="savePost" class="btn btn-primary">
-            <input type="button" value="Annuler" id="cancel" class="btn btn-secondary">
+
+            <!-- nécessite le fichier javascript 'imageControl.js' -->
+            <label for="Image" class="form-label">Image </label>
+            <div   class='imageUploader' 
+                   newImage='${create}' 
+                   controlId='Image' 
+                   imageSrc='${post.Image}' 
+                   waitingImage="Loading_icon.gif">
+            </div>
         </form>
     `);
+
+    // Initialise les contrôles d'image et la validation du formulaire
+    initImageUploaders();
     initFormValidation();
 
-    $('#PostForm').on("submit", async function (event) {
-        event.preventDefault();
-        let post = getFormData($("#PostForm"));
-        post.Id = parseInt(post.Id);
+
+    // Nettoyer anciens événements du header avant d’en attacher
+    $('#savePost').off("click").on("click", async function () {
+        let formData = getFormData($("#postForm"));
+
+        const imageInput = $(`#Image`); // input hidden ajouté par imageControl.js
+        if (imageInput.length) {
+            formData.Image = imageInput.val();
+        } else {
+            formData.Image = post.Image; // fallback si rien sélectionné
+        }
+
+        formData.Creation = post.Creation || Date.now();
         showWaitingGif();
-        let result = await Posts_API.Save(post, create);
+        let result = await Posts_API.Save(formData, create);
         if (result)
             renderPosts();
-        else {
-            if (Posts_API.currentStatus == 409)
-                renderError("Erreur: Conflits de titres...");
-            else
-                renderError();
-        }
+        else if (Posts_API.currentStatus == 409)
+            renderError("Erreur: Conflit de titres...");
+        else
+            renderError();
     });
-    $('#cancel').on("click", function () {
+
+    $('#abort').off("click").on("click", function () {
         renderPosts();
     });
 }
+
+
 
 function renderPost(post) {
     return $(`
@@ -308,10 +336,12 @@ function renderPost(post) {
             <div class="postContainer noselect">
                 <div class="postLayout">
                     <div class="post">
+                        <img src="${post.Image}" class="postImage" alt="${post.Title}" />
                         <span class="postTitle">${post.Title}</span>
                         <p class="postText">${post.Text}</p>
                     </div>
                     <span class="postCategory">${post.Category}</span>
+                    <span class="postDate">${new Date(post.Creation).toLocaleDateString()}</span>
                 </div>
                 <div class="postCommandPanel">
                     <span class="editCmd cmdIcon fa fa-pencil" editPostId="${post.Id}" title="Modifier ${post.Title}"></span>

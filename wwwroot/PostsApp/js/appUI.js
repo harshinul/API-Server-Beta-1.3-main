@@ -129,75 +129,89 @@ async function compileCategories() {
 }
 
 async function renderPostsPaged(container, queryString) {
-  queryString += "&sort=-Creation";
 
+    queryString += "&sort=-Creation";
 
-  if (selectedCategory !== "") {
-    queryString += "&Category=" + encodeURIComponent(selectedCategory);
-  }
-
-
-
-  await compileCategories();
-
-
-  const response = await Posts_API.GetQuery(queryString);
-  if (!response || !response.data) return true;
-
-  let posts = response.data;
-  if (!posts || posts.length === 0) return true;
-
-
-  let keys = $("#searchKeys").val()?.trim();
-  if (keys) {
-    const words = keys
-      .split(" ")
-      .map(w => w.trim().toLowerCase())
-      .filter(w => w.length >= minKeywordLenth);
-
-    if (words.length > 0) {
-      posts = posts.filter(p => {
-        const text = (p.Title + " " + p.Text).toLowerCase();
-        return words.every(w => text.includes(w));
-      });
+    
+    if (selectedCategory !== "") {
+        queryString += "&Category=" + encodeURIComponent(selectedCategory);
     }
-  }
 
+   
+    await compileCategories();
 
-  posts.forEach(p => container.append(renderPost(p)));
+    
+    const response = await Posts_API.GetQuery(queryString);
 
+    
+    if (!response || !response.data) {
+       
+        return true;
+    }
 
-  container.find(".editCmd").off().on("click", function () {
-    const id = $(this).attr("editPostId");
-    renderEditPostForm(id);
-  });
+    const rawPosts = response.data;
+   
 
-  container.find(".deleteCmd").off().on("click", function () {
-    const id = $(this).attr("deletePostId");
-    renderDeletePostForm(id);
-  });
+    // 1️⃣ Detect end-of-data BEFORE filtering
+    const isLastPage = rawPosts.length < 3;   // limit = 3
 
-  container.find(".expandText").off().on("click", function () {
-    let c = $(this).closest(".postContainerStyled");
-    let t = c.find(".postText");
-    t.removeClass("hideExtra").addClass("showExtra");
-    c.find(".expandText").hide();
-    c.find(".collapseText").show();
-  });
+    // 2️⃣ Apply search filtering AFTER
+    let posts = rawPosts;
+    let keys = $("#searchKeys").val()?.trim();
 
-  container.find(".collapseText").off().on("click", function () {
-    let c = $(this).closest(".postContainerStyled");
-    let t = c.find(".postText");
-    t.removeClass("showExtra").addClass("hideExtra");
-    c.find(".collapseText").hide();
-    c.find(".expandText").show();
-  });
+    if (keys) {
+        const words = keys
+            .split(" ")
+            .map(w => w.trim().toLowerCase())
+            .filter(w => w.length >= minKeywordLenth);
 
+        if (words.length > 0) {
+            posts = posts.filter(p => {
+                const text = (p.Title + " " + p.Text).toLowerCase();
+                return words.every(w => text.includes(w));
+            });
+        }
+    }
 
-  highlightKeywords();
+    
+    posts.forEach(p => container.append(renderPost(p)));
 
-  return false;
+    
+    container.find(".editCmd").off().on("click", function () {
+        const id = $(this).attr("editPostId");
+        renderEditPostForm(id);
+    });
+
+    container.find(".deleteCmd").off().on("click", function () {
+        const id = $(this).attr("deletePostId");
+        renderDeletePostForm(id);
+    });
+
+    container.find(".expandText").off().on("click", function () {
+        let c = $(this).closest(".postContainerStyled");
+        let t = c.find(".postText");
+        t.removeClass("hideExtra").addClass("showExtra");
+        c.find(".expandText").hide();
+        c.find(".collapseText").show();
+    });
+
+    container.find(".collapseText").off().on("click", function () {
+        let c = $(this).closest(".postContainerStyled");
+        let t = c.find(".postText");
+        t.removeClass("showExtra").addClass("hideExtra");
+        c.find(".collapseText").hide();
+        c.find(".expandText").show();
+    });
+
+    
+    highlightKeywords();
+
+    
+
+    
+    return isLastPage;
 }
+
 
 function start_Periodic_Refresh() {
   setInterval(async () => {

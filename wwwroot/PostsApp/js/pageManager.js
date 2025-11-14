@@ -58,10 +58,12 @@ class PageManager {
         });
     }
     setCurrentPageLimit() {
-        let nbColumns = Math.trunc(this.scrollPanel.innerWidth() / this.itemLayout.width);
-        if (nbColumns < 1) nbColumns = 1;
-        let nbRows = Math.round(this.scrollPanel.innerHeight() / this.itemLayout.height);
-        this.currentPage.limit = nbRows * nbColumns + nbColumns /* make sure to always have a content overflow */;
+        /**
+            let nbColumns = Math.trunc(this.scrollPanel.innerWidth() / this.itemLayout.width);
+            if (nbColumns < 1) nbColumns = 1;
+            let nbRows = Math.round(this.scrollPanel.innerHeight() / this.itemLayout.height);
+            this.currentPage.limit = nbRows * nbColumns + nbColumns /* make sure to always have a content overflow ;*/
+        this.currentPage.limit = 3;
     }
     currentPageToQueryString(append = false) {
         this.setCurrentPageLimit();

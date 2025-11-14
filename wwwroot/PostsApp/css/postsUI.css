@@ -3,6 +3,13 @@
     
 }
 
+.postDeleteForm {
+    max-height: 75vh;       /* limite la hauteur */
+    overflow-y: auto;       /* scroll vertical */
+    padding-right: 10px;    /* évite que le scroll colle au texte */
+}
+
+
 .postImage {
     width: 100%;
     max-width: 400px; /* 🔸 Limite la taille max pour pas qu’elle soit trop grande */

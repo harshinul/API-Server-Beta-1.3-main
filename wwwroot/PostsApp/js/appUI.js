@@ -400,24 +400,50 @@ async function renderDeletePostForm(id) {
     renderError("Post introuvable!");
     return;
   }
+
   const post = data;
 
+  const dateString = new Date(post.Creation).toLocaleDateString("fr-CA", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }) + " – " + new Date(post.Creation).toLocaleTimeString("fr-CA");
+
   $("#content").append(`
-        <div id="contentFormArea">
-            <div class="postDeleteForm">
-                <h4>Effacer le post suivant ?</h4><br>
-                <div class="postRow">
-                    <div class="postContainerStyled">
-                        <h3>${post.Title}</h3>
-                        <p>${post.Category}</p>
-                    </div>
-                </div>
-                <br>
-                <button id="confirmDelete" class="btn btn-danger">Effacer</button>
-                <button id="cancelDelete" class="btn btn-secondary">Annuler</button>
+    <div id="contentFormArea">
+      <div class="postDeleteForm">
+        
+        <h3 style="margin-bottom:20px;">Effacer le post suivant ?</h3>
+
+        <div class="postRow">
+          <div class="postContainerStyled">
+
+            <div class="postCategoryStyled">${post.Category.toUpperCase()}</div>
+
+            <div class="postHeaderRow">
+              <h2 class="postTitleLarge postTitle">${post.Title}</h2>
             </div>
+
+            <img src="${post.Image}" class="postImageLarge">
+
+            <div class="postDateStyled">${dateString}</div>
+
+            <p class="postTextStyled showExtra">
+              ${post.Text}
+            </p>
+
+          </div>
         </div>
-    `);
+
+        <div style="margin-top:25px;">
+          <button id="confirmDelete" class="btn btn-danger">Effacer</button>
+          <button id="cancelDelete" class="btn btn-secondary">Annuler</button>
+        </div>
+
+      </div>
+    </div>
+  `);
 
   $("#confirmDelete")
     .off()
@@ -450,6 +476,7 @@ async function renderDeletePostForm(id) {
       pageManager.reset();
     });
 }
+
 
 function renderPost(post) {
   return $(`

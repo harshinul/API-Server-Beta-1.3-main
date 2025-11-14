@@ -66,4 +66,24 @@ static API_URL() { return "http://localhost:5000/api/posts" };
             });
         });
     }
+    
+    static async GetQuery(queryString = "") {
+    Posts_API.initHttpState();
+    return new Promise(resolve => {
+        $.ajax({
+            url: this.API_URL() + queryString,
+            complete: data => {
+                Posts_API.Etag = data.getResponseHeader('ETag');
+                resolve({ 
+                    ETag: Posts_API.Etag, 
+                    data: data.responseJSON 
+                });
+            },
+            error: (xhr) => { 
+                Posts_API.setHttpErrorState(xhr); 
+                resolve(null); 
+            }
+        });
+    });
+}
 }

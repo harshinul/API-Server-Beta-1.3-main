@@ -1,353 +1,521 @@
 const periodicRefreshPeriod = 3;
-let contentScrollPosition = 0;
 let selectedCategory = "";
 let currentETag = "";
 let hold_Periodic_Refresh = false;
-
+let showKeywords = true;
+let minKeywordLenth = 2;
+let pageManager = null;
+let categories = [];
 Init_UI();
 
 function Init_UI() {
-    renderPosts();
-    $('#createPost').on("click", async function () {
-        saveContentScrollPosition();
-        renderCreatePostForm();
+  pageManager = new PageManager(
+    "scrollPanel",
+    "itemsPanel",
+    "postSample",
+    renderPostsPaged
+  );
+
+  pageManager.show(true);
+  setHeaderListMode();
+
+  $("#createPost")
+    .off()
+    .on("click", function () {
+      renderPostForm();
     });
-    $('#savePost').on("click", async function () {
-        renderPosts();
+
+  $("#aboutCmd")
+    .off()
+    .on("click", function () {
+      renderAbout();
     });
-    $('#abort').on("click", async function () {
-        renderPosts();
+
+  $(document).on("click", "#searchToggle", function () {
+    if ($("#searchInputContainer").length === 0) {
+      $("#searchArea").append(`
+                <div id="searchInputContainer">
+                    ${showSearch()[0].outerHTML}
+                </div>
+            `);
+    }
+    $("#searchInputContainer").toggleClass("active");
+  });
+
+  $(document).on("input", "#searchKeys", function () {
+    $(".highlight").each(function () {
+      $(this).replaceWith($(this).text());
     });
-    $('#aboutCmd').on("click", function () {
-        renderAbout();
-    });
-    start_Periodic_Refresh();
+    pageManager.reset();
+  });
+
+  start_Periodic_Refresh();
 }
 
-function start_Periodic_Refresh() {
-    setInterval(async () => {
-        if (!hold_Periodic_Refresh) {
-            await Posts_API.Head();
-            if (currentETag != Posts_API.Etag) {
-                currentETag = Posts_API.Etag;
-                saveContentScrollPosition();
-                renderPosts();
-            }
-        }
-    }, periodicRefreshPeriod * 1000);
+function setHeaderListMode() {
+  $("#createPost").show();
+  $("#savePost").hide();
+  $("#abort").hide();
+  $("#dropdownMenu").show();
+  $("#searchArea").show();
 }
 
-function renderAbout() {
-    hold_Periodic_Refresh = true;
-    saveContentScrollPosition();
-    eraseContent();
-    $("#createPost").hide();
-    $("#dropdownMenu").hide();
-    $("#abort").show();
-    $("#actionTitle").text("À propos...");
-    $("#content").append(`
-        <div class="aboutContainer">
-            <h2>Gestionnaire de posts</h2>
-            <hr>
-            <p>Application de gestion de posts démontrant une interface monopage réactive.</p>
-            <p>Auteur: Nicolas Chourot</p>
-            <p>Collège Lionel-Groulx, Automne 2025</p>
-        </div>
-    `);
+function setHeaderFormMode(showSave = true) {
+  $("#createPost").hide();
+  $("#dropdownMenu").hide();
+  $("#searchArea").hide();
+  $("#abort").show();
+  if (showSave) $("#savePost").show();
+  else $("#savePost").hide();
 }
-
-function updateDropDownMenu(categories) {
-    let DDMenu = $("#DDMenu");
-    let selectClass = selectedCategory === "" ? "fa-check" : "fa-fw";
-    DDMenu.empty();
-    DDMenu.append(`
+function updateDropDownMenu() {
+  let DDMenu = $("#DDMenu");
+  let selectClass = selectedCategory === "" ? "fa-check" : "fa-fw";
+  DDMenu.empty();
+  DDMenu.append(
+    $(`
         <div class="dropdown-item menuItemLayout" id="allCatCmd">
             <i class="menuIcon fa ${selectClass} mx-2"></i> Toutes les catégories
         </div>
-    `);
-    DDMenu.append(`<div class="dropdown-divider"></div>`);
-    categories.forEach(category => {
-        selectClass = selectedCategory === category ? "fa-check" : "fa-fw";
-        DDMenu.append(`
-            <div class="dropdown-item menuItemLayout category">
+        `)
+  );
+  DDMenu.append($(`<div class="dropdown-divider"></div>`));
+  categories.forEach((category) => {
+    selectClass = selectedCategory === category ? "fa-check" : "fa-fw";
+    DDMenu.append(
+      $(`
+            <div class="dropdown-item menuItemLayout category" data-category="${category}">
                 <i class="menuIcon fa ${selectClass} mx-2"></i> ${category}
             </div>
-        `);
-    });
-    DDMenu.append(`<div class="dropdown-divider"></div>`);
-    DDMenu.append(`
+        `)
+    );
+  });
+  DDMenu.append($(`<div class="dropdown-divider"></div> `));
+  DDMenu.append(
+    $(`
         <div class="dropdown-item menuItemLayout" id="aboutCmd">
             <i class="menuIcon fa fa-info-circle mx-2"></i> À propos...
         </div>
+        `)
+  );
+  $(document).on("click", "#allCatCmd", function () {
+    selectedCategory = "";
+    pageManager.reset();
+  });
+
+  $(document).on("click", ".category", function () {
+    selectedCategory = $(this).data("category");
+    pageManager.reset();
+  });
+
+  $(document).on("click", "#aboutCmd", function () {
+    renderAbout();
+  });
+}
+
+
+async function compileCategories() {
+  categories = [];
+  let response = await Posts_API.GetQuery("?select=Category&sort=Category");
+  if (!Posts_API.error) {
+    let items = response.data;
+    if (items != null) {
+      items.forEach((item) => {
+        if (!categories.includes(item.Category)) categories.push(item.Category);
+      });
+      updateDropDownMenu();
+    }
+  }
+}
+
+async function renderPostsPaged(container, queryString) {
+  queryString += "&sort=-Creation";
+
+  
+  if (selectedCategory !== "") {
+      queryString += "&Category=" + encodeURIComponent(selectedCategory);
+  }
+
+  
+
+  await compileCategories();
+
+
+  const response = await Posts_API.GetQuery(queryString);
+  if (!response || !response.data) return true;
+
+  let posts = response.data;
+  if (!posts || posts.length === 0) return true;
+
+
+  let keys = $("#searchKeys").val()?.trim();
+  if (keys) {
+      const words = keys
+        .split(" ")
+        .map(w => w.trim().toLowerCase())
+        .filter(w => w.length >= minKeywordLenth);
+
+      if (words.length > 0) {
+          posts = posts.filter(p => {
+              const text = (p.Title + " " + p.Text).toLowerCase();
+              return words.every(w => text.includes(w)); 
+          });
+      }
+  }
+
+
+  posts.forEach(p => container.append(renderPost(p)));
+
+
+  container.find(".editCmd").off().on("click", function () {
+      const id = $(this).attr("editPostId");
+      renderEditPostForm(id);
+  });
+
+  container.find(".deleteCmd").off().on("click", function () {
+      const id = $(this).attr("deletePostId");
+      renderDeletePostForm(id);
+  });
+
+  container.find(".expandText").off().on("click", function () {
+      let c = $(this).closest(".postContainerStyled");
+      let t = c.find(".postText");
+      t.removeClass("hideExtra").addClass("showExtra");
+      c.find(".expandText").hide();
+      c.find(".collapseText").show();
+  });
+
+  container.find(".collapseText").off().on("click", function () {
+      let c = $(this).closest(".postContainerStyled");
+      let t = c.find(".postText");
+      t.removeClass("showExtra").addClass("hideExtra");
+      c.find(".collapseText").hide();
+      c.find(".expandText").show();
+  });
+
+  
+  highlightKeywords();
+
+  return false; 
+}
+
+function start_Periodic_Refresh() {
+  setInterval(async () => {
+    if (!hold_Periodic_Refresh) {
+      await Posts_API.Head();
+      if (currentETag !== Posts_API.Etag) {
+        currentETag = Posts_API.Etag;
+        pageManager.reset();
+      }
+    }
+  }, periodicRefreshPeriod * 1000);
+}
+
+function renderAbout() {
+  hold_Periodic_Refresh = true;
+  setHeaderFormMode(false);
+
+  $("#scrollPanel").hide();
+  $("#contentFormArea").remove();
+  $("#content").append(`
+        <div id="contentFormArea">
+            <div class="aboutContainer">
+                <h2>Gestionnaire de posts</h2>
+                <hr>
+                <p>Application monopage réactive démontrant la pagination, la recherche et l’édition.</p>
+                <p>Auteur: Nicolas Chourot</p>
+                <p>Collège Lionel-Groulx, Automne 2025</p>
+            </div>
+        </div>
     `);
-    $('#aboutCmd').on("click", function () {
-        renderAbout();
+
+  $("#abort")
+    .off()
+    .on("click", function () {
+      hold_Periodic_Refresh = false;
+      $("#contentFormArea").remove();
+      $("#scrollPanel").show();
+      setHeaderListMode();
+      pageManager.reset();
     });
-    $('#allCatCmd').on("click", function () {
-        selectedCategory = "";
-        renderPosts();
-    });
-    $('.category').on("click", function () {
-        selectedCategory = $(this).text().trim();
-        renderPosts();
-    });
-}
-
-function compileCategories(posts) {
-    let categories = [];
-    if (posts != null) {
-        posts.forEach(post => {
-            if (!categories.includes(post.Category))
-                categories.push(post.Category);
-        });
-        updateDropDownMenu(categories);
-    }
-}
-
-async function renderPosts() {
-    hold_Periodic_Refresh = false;
-    showWaitingGif();
-    $("#actionTitle").text("Liste des posts");
-    $("#createPost").show();
-    $("#dropdownMenu").show();
-    $("#savePost").hide();
-    $("#abort").hide();
-    let posts = await Posts_API.Get();
-    currentETag = Posts_API.Etag;
-    compileCategories(posts);
-    eraseContent();
-    if (posts !== null) {
-        posts.forEach(post => {
-            if ((selectedCategory === "") || (selectedCategory === post.Category))
-                $("#content").append(renderPost(post));
-        });
-        restoreContentScrollPosition();
-
-        // attach edit/delete
-        $(".editCmd").on("click", function () {
-            saveContentScrollPosition();
-            renderEditPostForm($(this).attr("editPostId"));
-        });
-        $(".deleteCmd").on("click", function () {
-            saveContentScrollPosition();
-            renderDeletePostForm($(this).attr("deletePostId"));
-        });
-    } else {
-        renderError();
-    }
-}
-
-function showWaitingGif() {
-    $("#content").empty();
-    $("#content").append(`<div class='waitingGifcontainer'><img class='waitingGif' src='Loading_icon.gif' /></div>`);
-}
-
-function eraseContent() {
-    $("#content").empty();
-}
-
-function saveContentScrollPosition() {
-    contentScrollPosition = $("#content")[0].scrollTop;
-}
-
-function restoreContentScrollPosition() {
-    $("#content")[0].scrollTop = contentScrollPosition;
-}
-
-function renderError(message = "") {
-    message = (message == "" ? Posts_API.currentHttpError : message);
-    eraseContent();
-    $("#content").append(`<div class="errorContainer">${message}</div>`);
 }
 
 function renderCreatePostForm() {
-    renderPostForm();
+  renderPostForm(null);
 }
 
 async function renderEditPostForm(id) {
-    showWaitingGif();
-    let post = await Posts_API.Get(id);
-    if (post !== null)
-        renderPostForm(post);
-    else
-        renderError("Post introuvable!");
-}
+  hold_Periodic_Refresh = true;
+  setHeaderFormMode(true);
 
-async function renderDeletePostForm(id) {
-    showWaitingGif();
-    $("#createPost").hide();
-    $("#dropdownMenu").hide();
-    $("#savePost").show();
-    $("#abort").show();
-    $("#actionTitle").text("Retrait");
-    let post = await Posts_API.Get(id);
-    eraseContent();
-    if (post !== null) {
-        $("#content").append(`
-        <div class="postDeleteForm">
-            <h4>Effacer le post suivant?</h4><br>
-            <div class="postRow" post_id="${post.Id}">
-                <div class="postContainer noselect">
-                    <div class="postLayout">
-                    <img src="${post.Image}" class="postImage" alt="${post.Title}" />
-                        <div class="post">
-                            <span class="postTitle">${post.Title}</span>
-                        </div>
-                        <span class="postCategory">${post.Category}</span>
-                    </div>
-                </div>
+  $("#scrollPanel").hide();
+  $("#contentFormArea").remove();
+  $("#content").append(`
+        <div id="contentFormArea">
+            <div class='waitingGifcontainer'>
+                <img class='waitingGif' src='Loading_icon.gif' />
             </div>
         </div>
-        `);
-        // bouton global = confirmation suppression
-        $('#savePost').off("click").on("click", async function () {
-            showWaitingGif();
-            let result = await Posts_API.Delete(post.Id);
-            if (result)
-                renderPosts();
-            else
-                renderError();
-        });
+    `);
 
-        $('#abort').off("click").on("click", function () {
-            renderPosts();
-        });
-
-    } else {
-        renderError("Post introuvable!");
-    }
-}
-
-function getFormData($form) {
-    const removeTag = new RegExp("(<[a-zA-Z0-9]+>)|(</[a-zA-Z0-9]+>)", "g");
-    var jsonObject = {};
-    $.each($form.serializeArray(), (index, control) => {
-        jsonObject[control.name] = control.value.replace(removeTag, "");
-    });
-    return jsonObject;
-}
-
-function newPost() {
-    return { Id: 0, Title: "", Text: "", Category: "", Image: "", Creation: Date.now() };
+  const data = await Posts_API.Get(id);
+  if (!data) {
+    renderError("Post introuvable!");
+    return;
+  }
+  renderPostForm(data);
 }
 
 function renderPostForm(post = null) {
-    hold_Periodic_Refresh = true;
-    $("#createPost").hide();
-    $("#dropdownMenu").hide();
-    $("#savePost").show();
-    $("#savePost").show();
-    $("#abort").show();
-    eraseContent();
+  const create = post == null;
+  if (create) {
+    post = {
+      Id: 0,
+      Title: "",
+      Text: "",
+      Category: "",
+      Image: "",
+      Creation: Date.now(),
+    };
+  }
 
-    let create = post == null;
-    if (create) {
-        post = newPost();
-        post.Image = "images/no-image.png"; // image par défaut
-    }
+  hold_Periodic_Refresh = true;
+  setHeaderFormMode(true);
 
-    $("#actionTitle").text(create ? "Création" : "Modification");
+  $("#scrollPanel").hide();
+  $("#contentFormArea").remove();
 
-    $("#content").append(`
-        <form class="form" id="postForm">
-            <input type="hidden" name="Id" value="${post.Id}"/>
+  $("#content").append(`
+        <div id="contentFormArea">
+            <form class="form" id="postForm">
+                <input type="hidden" name="Id" value="${post.Id}">
+                <input type="hidden" name="Creation" value="${post.Creation}">
 
-            <label for="Title" class="form-label">Titre </label>
-            <input 
-                class="form-control Alpha"
-                name="Title" 
-                id="Title" 
-                placeholder="Titre"
-                required
-                RequireMessage="Veuillez entrer un titre"
-                InvalidMessage="Le titre comporte un caractère illégal"
-                value="${post.Title}"
-            />
+                <label for="Title" class="form-label">Titre</label>
+                <input class="form-control" name="Title" id="Title"
+                       placeholder="Titre" required value="${post.Title}">
 
-            <label for="Text" class="form-label">Texte </label>
-            <textarea
-                class="form-control"
-                name="Text"
-                id="Text"
-                placeholder="Contenu du post"
-                required
-                RequireMessage="Veuillez entrer le texte du post"
-            >${post.Text}</textarea>
+                <label for="Text" class="form-label">Texte</label>
+                <textarea class="form-control" name="Text" id="Text"
+                          placeholder="Contenu du post" required>${post.Text}</textarea>
 
-            <label for="Category" class="form-label">Catégorie </label>
-            <input 
-                class="form-control"
-                name="Category"
-                id="Category"
-                placeholder="Catégorie"
-                required
-                RequireMessage="Veuillez entrer une catégorie"
-                value="${post.Category}"
-            />
+                <label for="Category" class="form-label">Catégorie</label>
+                <input class="form-control" name="Category" id="Category"
+                       placeholder="Catégorie" required value="${post.Category}">
 
-            <!-- nécessite le fichier javascript 'imageControl.js' -->
-            <label for="Image" class="form-label">Image </label>
-            <div   class='imageUploader' 
-                   newImage='${create}' 
-                   controlId='Image' 
-                   imageSrc='${post.Image}' 
-                   waitingImage="Loading_icon.gif">
-            </div>
-        </form>
+                <label for="Image" class="form-label">Image</label>
+                <div class='imageUploader'
+                    newImage='${create}'
+                    controlId='Image'
+                    imageSrc='${post.Image}'
+                    waitingImage="Loading_icon.gif">
+                </div>
+            </form>
+        </div>
     `);
 
-    // Initialise les contrôles d'image et la validation du formulaire
-    initImageUploaders();
-    initFormValidation();
+  initImageUploaders();
+  initFormValidation();
 
+  $("#savePost")
+    .off()
+    .on("click", async function () {
+      let formData = getFormData($("#postForm"));
+      formData.Creation =
+        parseInt(formData.Creation) || post.Creation || Date.now();
 
-    // Nettoyer anciens événements du header avant d’en attacher
-    $('#savePost').off("click").on("click", async function () {
-        let formData = getFormData($("#postForm"));
+      $("#contentFormArea").html(`
+            <div class='waitingGifcontainer'>
+                <img class='waitingGif' src='Loading_icon.gif' />
+            </div>
+        `);
 
-        const imageInput = $(`#Image`); // input hidden ajouté par imageControl.js
-        if (imageInput.length) {
-            formData.Image = imageInput.val();
-        } else {
-            formData.Image = post.Image; // fallback si rien sélectionné
-        }
+      const result = await Posts_API.Save(formData, create);
+      if (!result) {
+        renderError("Erreur lors de l'enregistrement.");
+        return;
+      }
 
-        formData.Creation = post.Creation || Date.now();
-        showWaitingGif();
-        let result = await Posts_API.Save(formData, create);
-        if (result)
-            renderPosts();
-        else if (Posts_API.currentStatus == 409)
-            renderError("Erreur: Conflit de titres...");
-        else
-            renderError();
+      hold_Periodic_Refresh = false;
+      $("#contentFormArea").remove();
+      $("#scrollPanel").show();
+      setHeaderListMode();
+      pageManager.reset();
     });
 
-    $('#abort').off("click").on("click", function () {
-        renderPosts();
+  $("#abort")
+    .off()
+    .on("click", function () {
+      hold_Periodic_Refresh = false;
+      $("#contentFormArea").remove();
+      $("#scrollPanel").show();
+      setHeaderListMode();
+      pageManager.reset();
     });
 }
 
+async function renderDeletePostForm(id) {
+  hold_Periodic_Refresh = true;
+  setHeaderFormMode(false);
 
+  $("#scrollPanel").hide();
+  $("#contentFormArea").remove();
+
+  const data = await Posts_API.Get(id);
+  if (!data) {
+    renderError("Post introuvable!");
+    return;
+  }
+  const post = data;
+
+  $("#content").append(`
+        <div id="contentFormArea">
+            <div class="postDeleteForm">
+                <h4>Effacer le post suivant ?</h4><br>
+                <div class="postRow">
+                    <div class="postContainerStyled">
+                        <h3>${post.Title}</h3>
+                        <p>${post.Category}</p>
+                    </div>
+                </div>
+                <br>
+                <button id="confirmDelete" class="btn btn-danger">Effacer</button>
+                <button id="cancelDelete" class="btn btn-secondary">Annuler</button>
+            </div>
+        </div>
+    `);
+
+  $("#confirmDelete")
+    .off()
+    .on("click", async function () {
+      await Posts_API.Delete(id);
+      hold_Periodic_Refresh = false;
+      $("#contentFormArea").remove();
+      $("#scrollPanel").show();
+      setHeaderListMode();
+      pageManager.reset();
+    });
+
+  $("#cancelDelete")
+    .off()
+    .on("click", function () {
+      hold_Periodic_Refresh = false;
+      $("#contentFormArea").remove();
+      $("#scrollPanel").show();
+      setHeaderListMode();
+      pageManager.reset();
+    });
+
+  $("#abort")
+    .off()
+    .on("click", function () {
+      hold_Periodic_Refresh = false;
+      $("#contentFormArea").remove();
+      $("#scrollPanel").show();
+      setHeaderListMode();
+      pageManager.reset();
+    });
+}
 
 function renderPost(post) {
-    return $(`
+  return $(`
         <div class="postRow" post_id="${post.Id}">
-            <div class="postContainer noselect">
-                <div class="postLayout">
-                    <div class="post">
-                        <img src="${post.Image}" class="postImage" alt="${post.Title}" />
-                        <span class="postTitle">${post.Title}</span>
-                        <p class="postText">${post.Text}</p>
+            <div class="postContainerStyled">
+
+                <div class="postCategoryStyled">${post.Category.toUpperCase()}</div>
+
+                <div class="postHeaderRow">
+                    <h2 class="postTitleLarge postTitle">${post.Title}</h2>
+                    <div class="postIcons">
+                        <span class="editCmd cmdIcon fa fa-pencil"
+                              editPostId="${post.Id}"></span>
+                        <span class="deleteCmd cmdIcon fa fa-trash"
+                              deletePostId="${post.Id}"></span>
                     </div>
-                    <span class="postCategory">${post.Category}</span>
-                    <span class="postDate">${new Date(post.Creation).toLocaleDateString()}</span>
                 </div>
-                <div class="postCommandPanel">
-                    <span class="editCmd cmdIcon fa fa-pencil" editPostId="${post.Id}" title="Modifier ${post.Title}"></span>
-                    <span class="deleteCmd cmdIcon fa fa-trash" deletePostId="${post.Id}" title="Effacer ${post.Title}"></span>
+
+                <img src="${post.Image}" class="postImageLarge">
+
+                <div class="postDateStyled">
+                    ${new Date(post.Creation).toLocaleDateString("fr-CA", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })} – ${new Date(post.Creation).toLocaleTimeString("fr-CA")}
                 </div>
+
+                <p class="postTextStyled postText hideExtra">
+                    ${post.Text}
+                </p>
+
+                <div class="toggleTextContainer">
+                    <span class="expandText fa fa-angles-down"></span>
+                    <span class="collapseText fa fa-angles-up" style="display:none;"></span>
+                </div>
+
             </div>
+        </div>
+    `);
+}
+
+function showSearch() {
+  return $(`
+        <input type="search" id="searchKeys"
+               placeholder="Rechercher..."
+               class="form-control"
+               style="height:32px; padding:5px 10px; font-size:14px;">
+    `);
+}
+
+function highlight(text, elem) {
+  text = text.trim();
+  if (text.length < minKeywordLenth) return;
+
+  const html = elem.innerHTML;
+  const norm = html.toLowerCase();
+  const idx = norm.indexOf(text.toLowerCase());
+  if (idx < 0) return;
+
+  elem.innerHTML =
+    html.substring(0, idx) +
+    "<span class='highlight'>" +
+    html.substring(idx, idx + text.length) +
+    "</span>" +
+    html.substring(idx + text.length);
+}
+
+function highlightKeywords() {
+  const keys = $("#searchKeys").val();
+  if (!keys) return;
+
+  const words = keys.split(" ").filter((w) => w.length >= minKeywordLenth);
+
+  words.forEach((k) => {
+    $(".postTitle").each(function () {
+      highlight(k, this);
+    });
+    $(".postText").each(function () {
+      highlight(k, this);
+    });
+  });
+}
+
+function getFormData($form) {
+  const removeTag = /(<[^>]+>)/g;
+  let obj = {};
+  $.each($form.serializeArray(), (_, c) => {
+    obj[c.name] = c.value.replace(removeTag, "");
+  });
+  return obj;
+}
+
+function renderError(message) {
+  $("#contentFormArea").remove();
+  $("#scrollPanel").hide();
+  $("#content").append(`
+        <div id="contentFormArea">
+            <div class="errorContainer">${message}</div>
         </div>
     `);
 }

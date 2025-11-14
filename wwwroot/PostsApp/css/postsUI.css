@@ -65,3 +65,179 @@
 .postDeleteForm {
     margin: 20px;
 }
+/* Container global */
+.postContainerStyled {
+    width: 100%;
+    max-width: 750px;
+    margin: 25px auto;
+    padding: 20px;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #dcdcdc;
+}
+
+/* Catégorie */
+.postCategoryStyled {
+    font-size: 14px;
+    font-weight: bold;
+    color: #777;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+}
+
+/* Ligne avec Titre + icônes */
+.postHeaderRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Titre */
+.postTitleLarge {
+    font-size: 26px;
+    font-weight: bold;
+    margin: 0;
+    max-width: 85%;
+}
+
+/* Icônes */
+.postIcons .cmdIcon {
+    font-size: 20px;
+    margin-left: 10px;
+    cursor: pointer;
+}
+
+/* Image principale */
+.postImageLarge {
+    width: 100%;
+    max-height: 350px;
+    object-fit: cover;
+    margin-top: 10px;
+    border-radius: 4px;
+}
+
+/* Date */
+.postDateStyled {
+    color: #555;
+    font-size: 13px;
+    margin: 10px 0;
+    font-style: italic;
+}
+
+/* Texte */
+.postTextStyled {
+    font-size: 15px;
+    line-height: 1.6;
+    text-align: justify;
+    color: #333;
+    margin-top: 15px;
+}
+.postIcons {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Lorsque la souris entre dans le post */
+.postContainerStyled:hover .postIcons {
+    opacity: 1;
+}
+
+/* Petit style visuel (facultatif mais propre) */
+.postIcons .cmdIcon {
+    font-size: 20px;
+    margin-left: 10px;
+    cursor: pointer;
+    color: #333;
+    transition: color 0.2s ease, transform 0.1s ease;
+}
+
+.postIcons .cmdIcon:hover {
+    color: #000;
+    transform: scale(1.15);
+}
+#searchArea {
+    position: relative;
+    width: 100%;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    box-sizing: border-box;
+}
+
+#searchToggle {
+    font-size: 20px;
+    cursor: pointer;
+}
+
+#searchInputContainer {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-55%);   
+    width: 250px;
+    display: none;
+    margin-top: 10px;
+}
+
+#searchInputContainer.active {
+    display: block;
+}
+
+#searchInputContainer input[type="search"] {
+    width: 100%;
+    height: 32px;
+    padding: 5px 10px;
+    font-size: 14px;
+}
+.highlight {
+    background-color: yellow;
+    padding: 0 2px;
+}
+.hideExtra {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;        
+    -webkit-box-orient: vertical;
+}
+
+.showExtra {
+    height: auto;
+    overflow: visible;
+    display: block;
+}
+.toggleTextContainer {
+    text-align: center;      
+    margin-top: 10px;        
+    font-size: 22px;         
+}
+
+.toggleTextContainer span {
+    color: #1a73e8;          
+    cursor: pointer;
+    margin: 0 8px;
+    transition: 0.2s ease;
+}
+
+.toggleTextContainer span:hover {
+    transform: scale(1.2);   
+}
+/* Le scroll DOIT être SEULEMENT dans scrollPanel */
+#content {
+    overflow: hidden;
+}
+
+/* Le vrai scroll interne paginé */
+#scrollPanel {
+    height: calc(100vh - 180px); /* Ajuste la hauteur */
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+/* L’endroit où le PageManager insère les posts */
+#itemsPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}

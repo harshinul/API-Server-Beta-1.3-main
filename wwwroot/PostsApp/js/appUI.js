@@ -130,50 +130,39 @@ async function compileCategories() {
 
 async function renderPostsPaged(container, queryString) {
 
+   
     queryString += "&sort=-Creation";
 
-    
+   
     if (selectedCategory !== "") {
         queryString += "&Category=" + encodeURIComponent(selectedCategory);
     }
 
    
+    let keys = $("#searchKeys").val()?.trim();
+    if (keys) {
+        queryString += "&keywords=" + encodeURIComponent(keys);
+    }
+
+   
     await compileCategories();
 
-    
+  
     const response = await Posts_API.GetQuery(queryString);
 
-    
     if (!response || !response.data) {
-       
-        return true;
+        return true; 
     }
 
     const rawPosts = response.data;
-   
-
-    // 1️⃣ Detect end-of-data BEFORE filtering
-    const isLastPage = rawPosts.length < 3;   // limit = 3
-
-    // 2️⃣ Apply search filtering AFTER
-    let posts = rawPosts;
-    let keys = $("#searchKeys").val()?.trim();
-
-    if (keys) {
-        const words = keys
-            .split(" ")
-            .map(w => w.trim().toLowerCase())
-            .filter(w => w.length >= minKeywordLenth);
-
-        if (words.length > 0) {
-            posts = posts.filter(p => {
-                const text = (p.Title + " " + p.Text).toLowerCase();
-                return words.every(w => text.includes(w));
-            });
-        }
-    }
 
     
+    const isLastPage = rawPosts.length < 3;  // pagination = 3 posts
+
+    
+    const posts = rawPosts;
+
+  
     posts.forEach(p => container.append(renderPost(p)));
 
     
@@ -182,11 +171,13 @@ async function renderPostsPaged(container, queryString) {
         renderEditPostForm(id);
     });
 
+    
     container.find(".deleteCmd").off().on("click", function () {
         const id = $(this).attr("deletePostId");
         renderDeletePostForm(id);
     });
 
+  
     container.find(".expandText").off().on("click", function () {
         let c = $(this).closest(".postContainerStyled");
         let t = c.find(".postText");
@@ -195,6 +186,7 @@ async function renderPostsPaged(container, queryString) {
         c.find(".collapseText").show();
     });
 
+    
     container.find(".collapseText").off().on("click", function () {
         let c = $(this).closest(".postContainerStyled");
         let t = c.find(".postText");
@@ -207,10 +199,9 @@ async function renderPostsPaged(container, queryString) {
     highlightKeywords();
 
     
-
-    
     return isLastPage;
 }
+
 
 
 function start_Periodic_Refresh() {

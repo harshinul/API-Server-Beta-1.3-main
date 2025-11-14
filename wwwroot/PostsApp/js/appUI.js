@@ -131,12 +131,12 @@ async function compileCategories() {
 async function renderPostsPaged(container, queryString) {
   queryString += "&sort=-Creation";
 
-  
+
   if (selectedCategory !== "") {
-      queryString += "&Category=" + encodeURIComponent(selectedCategory);
+    queryString += "&Category=" + encodeURIComponent(selectedCategory);
   }
 
-  
+
 
   await compileCategories();
 
@@ -150,17 +150,17 @@ async function renderPostsPaged(container, queryString) {
 
   let keys = $("#searchKeys").val()?.trim();
   if (keys) {
-      const words = keys
-        .split(" ")
-        .map(w => w.trim().toLowerCase())
-        .filter(w => w.length >= minKeywordLenth);
+    const words = keys
+      .split(" ")
+      .map(w => w.trim().toLowerCase())
+      .filter(w => w.length >= minKeywordLenth);
 
-      if (words.length > 0) {
-          posts = posts.filter(p => {
-              const text = (p.Title + " " + p.Text).toLowerCase();
-              return words.every(w => text.includes(w)); 
-          });
-      }
+    if (words.length > 0) {
+      posts = posts.filter(p => {
+        const text = (p.Title + " " + p.Text).toLowerCase();
+        return words.every(w => text.includes(w));
+      });
+    }
   }
 
 
@@ -168,35 +168,35 @@ async function renderPostsPaged(container, queryString) {
 
 
   container.find(".editCmd").off().on("click", function () {
-      const id = $(this).attr("editPostId");
-      renderEditPostForm(id);
+    const id = $(this).attr("editPostId");
+    renderEditPostForm(id);
   });
 
   container.find(".deleteCmd").off().on("click", function () {
-      const id = $(this).attr("deletePostId");
-      renderDeletePostForm(id);
+    const id = $(this).attr("deletePostId");
+    renderDeletePostForm(id);
   });
 
   container.find(".expandText").off().on("click", function () {
-      let c = $(this).closest(".postContainerStyled");
-      let t = c.find(".postText");
-      t.removeClass("hideExtra").addClass("showExtra");
-      c.find(".expandText").hide();
-      c.find(".collapseText").show();
+    let c = $(this).closest(".postContainerStyled");
+    let t = c.find(".postText");
+    t.removeClass("hideExtra").addClass("showExtra");
+    c.find(".expandText").hide();
+    c.find(".collapseText").show();
   });
 
   container.find(".collapseText").off().on("click", function () {
-      let c = $(this).closest(".postContainerStyled");
-      let t = c.find(".postText");
-      t.removeClass("showExtra").addClass("hideExtra");
-      c.find(".collapseText").hide();
-      c.find(".expandText").show();
+    let c = $(this).closest(".postContainerStyled");
+    let t = c.find(".postText");
+    t.removeClass("showExtra").addClass("hideExtra");
+    c.find(".collapseText").hide();
+    c.find(".expandText").show();
   });
 
-  
+
   highlightKeywords();
 
-  return false; 
+  return false;
 }
 
 function start_Periodic_Refresh() {
@@ -263,20 +263,38 @@ async function renderEditPostForm(id) {
     renderError("Post introuvable!");
     return;
   }
-  renderPostForm(data);
+  renderPostForm(data, true);
 }
 
-function renderPostForm(post = null) {
+function renderPostForm(post = null, edit = false) {
   const create = post == null;
+  let oldCreationDate;
+  
+  const checkboxHTML = edit ? `
+    <label class="form-label">Conserver la date de création</label>
+    <input type="checkbox" id="keepOldCreationDate" name="keepOldCreationDate" checked>
+  ` : "";
+
   if (create) {
     post = {
       Id: 0,
       Title: "",
       Text: "",
       Category: "",
-      Image: "",
+      Image: "images/no-image.png",
       Creation: Date.now(),
-    };
+    }
+  }
+  else {
+    oldCreationDate = post.Creation;
+    post = {
+      Id: post.Id,
+      Title: post.Title,
+      Text: post.Text,
+      Category: post.Category,
+      Image: post.Image || "images/no-image.png",
+      Creation: Date.now(),
+    }
   }
 
   hold_Periodic_Refresh = true;
@@ -310,6 +328,8 @@ function renderPostForm(post = null) {
                     imageSrc='${post.Image}'
                     waitingImage="Loading_icon.gif">
                 </div>
+                
+                ${checkboxHTML}
             </form>
         </div>
     `);
@@ -321,6 +341,15 @@ function renderPostForm(post = null) {
     .off()
     .on("click", async function () {
       let formData = getFormData($("#postForm"));
+
+      // si l'utilisateur veut garder l'ancienne date
+      if ($("#keepOldCreationDate").is(":checked") && !create) {
+        formData.Creation = oldCreationDate;
+      }
+      else {
+        formData.Creation = Date.now();
+      }
+
       formData.Creation =
         parseInt(formData.Creation) || post.Creation || Date.now();
 
@@ -438,11 +467,11 @@ function renderPost(post) {
 
                 <div class="postDateStyled">
                     ${new Date(post.Creation).toLocaleDateString("fr-CA", {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })} – ${new Date(post.Creation).toLocaleTimeString("fr-CA")}
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })} – ${new Date(post.Creation).toLocaleTimeString("fr-CA")}
                 </div>
 
                 <p class="postTextStyled postText hideExtra">

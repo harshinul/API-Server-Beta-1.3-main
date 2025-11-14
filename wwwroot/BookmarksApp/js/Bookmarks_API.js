@@ -29,6 +29,28 @@ class Bookmarks_API {
             });
         });
     }
+
+    static start_Periodic_Refresh(callback) {
+        callback();
+        setInterval(async () => {
+            if (!this.hold_Periodic_Refresh) {
+                let etag = await this.Head();
+                console.log(this.currentETag)
+                if (this.currentETag != etag) {
+                    this.currentETag = etag;
+                    console.log('refresh')
+                    callback();
+                }
+            }
+        }, this.periodicRefreshPeriod * 1000);
+    }
+    static resume_Periodic_Refresh() {
+        this.hold_Periodic_Refresh = false;
+    }
+    static stop_Periodic_Refresh() {
+        this.hold_Periodic_Refresh = true;
+    }
+
     static async Get(id = null) {
         Bookmarks_API.initHttpState();
         return new Promise(resolve => {
